@@ -166,7 +166,10 @@ namespace embree
             
             if (any(valid0))
             {
+#if !defined(__SYCL_DEVICE_ONLY__)
+              /* Xe3 may store UVs in UNORM format, so we can't use negative V coordinates */
               vv = madd(2.0f,vv,vfloat<M>(-1.0f));
+#endif
               RibbonHit<NativeCurve3ff,M> bhit(valid0,vu,vv,vt,i,N,curve3D);
               ishit |= epilog(bhit.valid,bhit);
             }

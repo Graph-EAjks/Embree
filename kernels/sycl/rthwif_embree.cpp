@@ -725,6 +725,19 @@ SYCL_EXTERNAL __attribute__((always_inline)) void rtcIntersectRTHW(sycl::global_
     rayhit_i->hit.primID = primID;
     rayhit_i->hit.u = uv.x();
     rayhit_i->hit.v = uv.y();
+
+    if (RTC_FEATURE_FLAG_CURVES & TRAV_LOOP_FEATURES) {
+      if (intel_get_hit_candidate(query, intel_hit_type_committed_hit) == intel_candidate_type_procedural)
+      {
+        Geometry* geom = scene->get(geomID);
+        if (geom->getTypeMask() & Geometry::MTY_CURVES &&
+           (geom->getCurveType() == Geometry::GTY_SUBTYPE_FLAT_CURVE || geom->getCurveType() == Geometry::GTY_SUBTYPE_ORIENTED_CURVE))
+        {
+          /* for curves we need to convert the v coordinates from [0,1] to [-1,1] */
+          rayhit_i->hit.v = rayhit_i->hit.v * 2.0f - 1.0f;
+        }
+      }
+    }
     
 #if RTC_MAX_INSTANCE_LEVEL_COUNT > 1
     for (uint32_t l=0; l<RTC_MAX_INSTANCE_LEVEL_COUNT; l++) {

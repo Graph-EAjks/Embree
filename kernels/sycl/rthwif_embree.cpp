@@ -566,12 +566,15 @@ __forceinline bool invokeTriangleIntersectionFilter(intel_ray_query_t& query, Ge
   return ishit;
 }
 
-__forceinline bool commit_potential_hit(intel_ray_query_t& query, RayHit& ray) {
-  intel_ray_query_commit_potential_hit_override (query, ray.tfar, float2(ray.u, ray.v));
+__forceinline bool commit_potential_hit(intel_ray_query_t& query, RayHit& ray, bool scale_v) {
+    /* Xe3 may store UVs in UNORM format, so we can't use negative V coordinates here
+      Leaving the CPU code path as is, GPUs will apply the scale later. */
+  float v = scale_v ? madd(ray.v, 0.5f, 0.5f) : ray.v;
+  intel_ray_query_commit_potential_hit_override (query, ray.tfar, float2(ray.u, v));
   return false;
 }
 
-__forceinline bool commit_potential_hit(intel_ray_query_t& query, Ray& ray) {
+__forceinline bool commit_potential_hit(intel_ray_query_t& query, Ray& ray, bool) {
   intel_ray_query_commit_potential_hit_override (query, ray.tfar, float2(0.0f, 0.0f));
   return true;
 }
@@ -625,10 +628,11 @@ __forceinline void trav_loop(intel_ray_query_t& query, Ray& ray, Scene* scene, s
     {
       if (candidate == intel_candidate_type_procedural)
       {
-        if (intersect_primitive(query,ray,scenes,geom,context,geomID,primID,feature_mask))
-          if (commit_potential_hit (query, ray))
+        if (intersect_primitive(query,ray,scenes,geom,context,geomID,primID,feature_mask)) {
+          bool scale_v = geom->getTypeMask() & Geometry::MTY_FLAT_CURVES;
+          if (commit_potential_hit (query, ray, scale_v))
             break; // shadow rays break at first hit
-
+        }
       }
       else // if (candidate == TRIANGLE)
       {
